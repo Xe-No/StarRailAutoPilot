@@ -39,9 +39,10 @@ class calculated:
         self.order = order
         self.adb_path = adb_path
         self.title = title
+        self.config_obj = read_json_file(CONFIG_FILE_NAME)
 
         self.adb = ADB(order, adb_path)
-        self.scaling = read_json_file(CONFIG_FILE_NAME).get("scaling", 1)
+        self.scaling = self.config_obj.get("scaling", 1)
         self.mouse = MouseController()
         self.keyboard = KeyboardController()
         self.ocr = CnOcr(det_model_name=det_model_name, rec_model_name=rec_model_name,det_root="./model/cnocr", rec_root="./model/cnstd") if not number else CnOcr(det_model_name=det_model_name, rec_model_name=rec_model_name,det_root="./model/cnocr", rec_root="./model/cnstd", cand_alphabet='0123456789')
@@ -125,10 +126,10 @@ class calculated:
             :param points: 百分比坐标
         """
 
-        scaling = read_json_file(CONFIG_FILE_NAME)["scaling"]
+        scaling = self.config_obj["scaling"]
         left, top, right, bottom = self.window.left, self.window.top, self.window.right, self.window.bottom
-        real_width = read_json_file(CONFIG_FILE_NAME)["real_width"]
-        real_height = read_json_file(CONFIG_FILE_NAME)["real_height"]
+        real_width = self.config_obj["real_width"]
+        real_height = self.config_obj["real_height"]
         x, y = int(left + (right - left) / 100 * points[0]), int(
             top + (bottom - top) / 100 * points[1]
         )
@@ -156,7 +157,7 @@ class calculated:
             :param points: 坐标
         """
         if self.platform == _("PC"):
-            scaling = read_json_file(CONFIG_FILE_NAME)["scaling"]
+            scaling = self.config_obj["scaling"]
             left, top, right, bottom = self.window.left, self.window.top, self.window.right, self.window.bottom
             x, y = int(left + points[0]), int(top + points[1])
         elif self.platform == _("模拟器"):
@@ -207,10 +208,10 @@ class calculated:
             :param points: 图像截取范围
         """
         if self.platform == _("PC"):
-            scaling = read_json_file(CONFIG_FILE_NAME).get("scaling", 1.0)
-            borderless = read_json_file(CONFIG_FILE_NAME).get("borderless", False)
-            left_border = read_json_file(CONFIG_FILE_NAME).get("left_border", 11)
-            up_border = read_json_file(CONFIG_FILE_NAME).get("up_border", 56)
+            scaling = self.config_obj.get("scaling", 1.0)
+            borderless = self.config_obj.get("borderless", False)
+            left_border = self.config_obj.get("left_border", 11)
+            up_border = self.config_obj.get("up_border", 56)
             #points = (points[0]*1.5/scaling,points[1]*1.5/scaling,points[2]*1.5/scaling,points[3]*1.5/scaling)
             if borderless:
                 left, top, right, bottom = self.window.left, self.window.top, self.window.right, self.window.bottom
@@ -271,6 +272,7 @@ class calculated:
             "map_1_point" : [(593, 346),(593, 556)],
             "transfer": _("传送"),
             "map_1-2": _("收容舱段"),
+            "map_1-2_point_2": [(700, 346),(600, 346)],
             "map_1-3": _("支援舱段"),
             "map_1-3_point_1": [(593, 346),(700, 346)],
             #"orientation_3": _("雅利洛-VI"),
@@ -403,42 +405,45 @@ class calculated:
             :param type: 类型 大世界/模拟宇宙
         """
         start_time = time.time()
-        attack = cv.imread("./temp/pc/attack.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/attack.jpg")
-        doubt = cv.imread("./temp/pc/doubt.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/doubt.jpg")
-        warn = cv.imread("./temp/pc/warn.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/warn.jpg")
+        attack = cv.imread("./imgs/attack.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/attack.jpg")
+        doubt = cv.imread("./imgs/doubt.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/doubt.jpg")
+        warn = cv.imread("./imgs/warn.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/warn.jpg")
+        tagz = cv.imread("./imgs/tagz.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/tagz.jpg")
+        log.info(_("识别中"))
         while True:
-            log.info(_("识别中"))
+            dt =  time.time() - start_time
+            tagz_val = self.scan_screenshot(tagz, pos=(40,0,60,15))["max_val"]
+            log.info(f"识别时间{dt} 识别Z {tagz_val}")
+            if dt > 10:  # 如果已经识别了10秒还未找到目标图片，则退出循环
+                log.info(_("识别超时,此处可能无敌人"))
+                return
+            if (self.scan_screenshot(tagz, pos=(40,0,50,15))["max_val"]) < 0.98 : continue  # 没有Z标志时，直接继续
             attack_result = self.scan_screenshot(attack)
-            doubt_result = self.scan_screenshot(doubt)
-            warn_result = self.scan_screenshot(warn)
             if attack_result["max_val"] > 0.98:
                 #points = self.calculated(result, target.shape)
-                points = attack_result["max_loc"]
+                points = attack_result["max_loc"] # 这里好像没有必要点击攻击标志
                 if self.platform == _("PC"):
                     self.Click(points)
                     break
                 else:
                     self.adb.input_tap((1040, 550))
                     break
-            elif doubt_result["max_val"] > 0.9 or warn_result["max_val"] > 0.95:
+            elif self.scan_screenshot(doubt)["max_val"] > 0.9 or self.scan_screenshot(warn)["max_val"] > 0.95: # if A or B，顺次执行，A为真时不会执行B，减少开销
                 log.info(_("识别到疑问或是警告,等待怪物开战"))
                 time.sleep(3)
                 if  self.platform == _("PC"):
-                    target = cv.imread("./temp/pc/finish_fighting.jpg")  # 識別是否已進入戰鬥，若已進入則跳出迴圈
+                    target = cv.imread("./imgs/finish_fighting.jpg")  # 識別是否已進入戰鬥，若已進入則跳出迴圈
                 else:
-                    target = cv.imread("./temp/mnq/finish_fighting.jpg")
+                    target = cv.imread("./imgs/finish_fighting.jpg")
                 time.sleep(0.3)
-                result = self.scan_screenshot(target)
+                result = self.scan_screenshot(target, pos=(90,100,90,100))
                 if result["max_val"] < 0.95:
                     break
-            elif time.time() - start_time > 10:  # 如果已经识别了10秒还未找到目标图片，则退出循环
-                log.info(_("识别超时,此处可能无敌人"))
-                return
             time.sleep(0.1)
         time.sleep(6)
-        target = cv.imread("./temp/pc/auto.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/auto.jpg")
+        target = cv.imread("./imgs/auto.jpg") if self.platform == _("PC") else cv.imread("./temp/mnq/auto.jpg")
         start_time = time.time()
-        if read_json_file(CONFIG_FILE_NAME)["auto_battle_persistence"] != 1:
+        if self.config_obj["auto_battle_persistence"] != 1:
             while True:
                 result = self.scan_screenshot(target)
                 if result["max_val"] > 0.9:
@@ -492,7 +497,7 @@ class calculated:
             视角转动
         """
         # 该公式为不同缩放比之间的转化
-        scaling = read_json_file(CONFIG_FILE_NAME)["scaling"]
+        scaling = self.config_obj["scaling"]
         dx = int(x * scaling)
         i = int(dx/200)
         last = dx - i*200
@@ -526,13 +531,13 @@ class calculated:
             :param com: 键盘操作 wasdf
             :param time 操作时间,单位秒
         '''
-        move_excursion = read_json_file(CONFIG_FILE_NAME).get("move_excursion", 0)
-        move_division_excursion = read_json_file(CONFIG_FILE_NAME).get("move_division_excursion", 1)
+        move_excursion = self.config_obj.get("move_excursion", 0)
+        move_division_excursion = self.config_obj.get("move_division_excursion", 1)
         if self.platform == _("PC"):
             self.keyboard.press(com)
             result = self.get_pix_bgr(pos=(1712, 958))
             log.info(result)
-            if read_json_file(CONFIG_FILE_NAME).get("sprint", False) and (self.compare_lists(result, [120, 160, 180]) or self.compare_lists([200, 200, 200], result)):
+            if self.config_obj.get("sprint", False) and (self.compare_lists(result, [120, 160, 180]) or self.compare_lists([200, 200, 200], result)):
                 time.sleep(0.05)
                 log.info("疾跑")
                 self.mouse.press(mouse.Button.right)
@@ -786,22 +791,25 @@ class calculated:
                 return endtime
             time.sleep(0.1)
 
-    def switch_window(self):
+    def switch_window(self, dt=0.1):
         if self.platform == _("PC"):
             ws = gw.getWindowsWithTitle(self.title)
             kc = KeyboardController()
+            time.sleep(dt)
             if len(ws) >= 1 :
                 for w in ws:
                     # 避免其他窗口也包含崩坏：星穹铁道，比如正好开着github脚本页面
                     # log.debug(w.title)
                     if w.title == self.title:
                         #client.Dispatch("WScript.Shell").SendKeys('%')
-                        kc.press('%')
-                        kc.release('%')
+                        # kc.press('%')
+                        # kc.release('%')
                         w.activate()
                         break
             else:
                 log.info(_('没找到窗口{title}').format(title=self.title))
+            time.sleep(dt)
+
 
     def open_map(self, open_key):
         while True:

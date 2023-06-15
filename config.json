@@ -1,0 +1,21 @@
+{
+  "real_width": 1920,
+  "auto_battle_persistence": 1,
+  "borderless": "True",
+  "real_height": 1080,
+  "github_proxy": "",
+  "rawgithub_proxy": "",
+  "webhook_url": "",
+  "start": false,
+  "temp_version": "0",
+  "star_version": "0",
+  "open_map": "m",
+  "level": "INFO",
+  "adb": "127.0.0.1:62001",
+  "adb_path": "temp\\adb\\adb",
+  "proxies": "",
+  "language": "zh_CN",
+  "move_excursion": 0,
+  "move_division_excursion": 1,
+  "sprint": false
+}

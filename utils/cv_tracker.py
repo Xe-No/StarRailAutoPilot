@@ -7,14 +7,17 @@ import time
 import sys, os, glob
 import utils.cv_tools as ct
 from utils.switch_window import switch_window as sw
+from utils.calculated import calculated 
 from utils.get_angle import *
 from utils.route_helper import *
+from utils.log import log, set_debug
 # from ray_casting import ray_casting
 # import log
 import win32api
 import win32con
 import pyautogui
 import math
+
 from PIL import Image
 
 
@@ -51,6 +54,8 @@ def find_best_match(img, template, scale_range=(1.4, 2.0, 0.05), mask=False):
 class Tracker():
     """docstring for Tracker"""
     def __init__(self):
+        self.cc = calculated()
+
         self.map_prefix = 'datas/map_raw/'
         self.masked_map_prefix = 'datas/map_masked/'
         self.template_prefix = 'datas/map_template_sample/'
@@ -331,7 +336,8 @@ class Tracker():
             angle = np.degrees(np.arctan2(dy, dx))
             r = np.linalg.norm([dx,dy])
             if r < 30:
-                pyautogui.click()
+                # pyautogui.click()
+                self.cc.fighting()
             self.turn_to(angle, moving=1)
         
 
@@ -543,7 +549,41 @@ class Tracker():
         
         return scale
 
+    def run_route(self, map_index, path= 'maps/'):
+        img_r = ct.take_screenshot(self.minimap_rect)
+        map_bgra = cv.imread(f'{path}{map_index}.png', cv.IMREAD_UNCHANGED)
+        map_bgr = cv.imread(f'{path}{map_index}.png')
+        # self.load_all_masked_maps()
 
+        r = np.sum((map_bgr-self.bgr_map_way)**2,axis=-1)<= 64
+
+        # log.info(r.astype(np.uint8))
+        way_points = ct.find_color_points(map_bgr, self.bgr_map_way)
+        start_point = ct.find_color_points(map_bgr, self.bgr_map_start)[0]
+        log.info(way_points)
+        log.info(start_point)
+
+        pyautogui.keyDown('w')
+        current_point = start_point
+        sorted_points = [start_point]
+        while 1:
+            i, next_point = ct.find_nearest_point(way_points, current_point)
+            log.info(next_point)
+
+            current_point = next_point
+            
+            sorted_points.append(way_points.pop(i))
+            if len(way_points) == 0:
+                break
+
+        log.info(sorted_points)
+
+        for i in range(1, len(sorted_points)):
+            x0, y0 = sorted_points[i-1]
+            x1, y1 = sorted_points[i]
+            self.move_to([x0, y0], [x1, y1], map_bgra)
+
+        pyautogui.keyUp('w')
 
 def test_1():
 
@@ -695,7 +735,8 @@ def test_7():
             move(r/25)
             time.sleep(0.3)
 
-        
+
+
 
 
 if __name__ == '__main__':
