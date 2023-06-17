@@ -1,6 +1,5 @@
-import time, timeit, sys
 from utils.cv_tracker import Tracker
-from utils.log import log, set_debug
+from utils.log import log
 
 path = 'maps/'
 map_index = '39-1'
