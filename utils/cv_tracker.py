@@ -124,7 +124,7 @@ class Tracker():
         if img_path:
             img_r = cv.imread(prefix + img_path)
         else:
-            img_r = take_screenshot(self.minimap_rect)
+            img_r = ct.take_screenshot(self.minimap_rect)
         return img_r
 
     def get_minimap_mask(self, mini_r, color_range = np.array([[0,0,180],[360,10,255]]) ):
@@ -142,7 +142,7 @@ class Tracker():
         img_s =self.get_minimap_mask(img_r)
         img_s = cv.resize(img_s, (0,0), fx = scale, fy = scale) # 小地图到大地图的缩放尺度
         w,h = img_s.shape[:2]
-        min_val, max_val, min_loc, max_loc = get_loc(map_b, img_s)
+        min_val, max_val, min_loc, max_loc = ct.get_loc(map_b, img_s)
 
         print(max_val)
         cx = max_loc[0] + w//2
@@ -154,9 +154,9 @@ class Tracker():
         # 固定地图，识别坐标 map_index 图片索引 img 彩色图
         left, top, width, height = rect
 
-        img_s = get_mask_mk2(img_r)
+        img_s = ct.get_mask_mk2(img_r)
         
-        map_b = get_mask_mk3(map_bgra)
+        map_b = ct.get_mask_mk3(map_bgra)
         if rect != [0,0,0,0]:
             map_b = map_b[top:top+height,left:left+width]
 
@@ -170,15 +170,15 @@ class Tracker():
 
     def get_front_angle(self):
         main_angle = get_angle()
-        mini_r = take_fine_screenshot(self.minimap_rect, n=1, dy=30)
+        mini_r = ct.take_fine_screenshot(self.minimap_rect, n=1, dy=30)
         mini_r = cv.cvtColor(mini_r, cv.COLOR_BGR2GRAY)
         mini_b = cv.threshold(mini_r, 20, 150, cv.THRESH_BINARY)[1]
         # 扇形组成简易神经网络
         h,w = mini_r.shape[:2]
         fans = {}
-        fans['f'] = get_camera_fan(color = 255, angle=main_angle, w=w, h=h, delta=30, dimen=1, radius=60)
-        fans['l'] = get_camera_fan(color = 255, angle=main_angle-60, w=w, h=h, delta=90, dimen=1, radius=60)
-        fans['r'] = get_camera_fan(color = 255, angle=main_angle+60, w=w, h=h, delta=90, dimen=1, radius=60)
+        fans['f'] = ct.get_camera_fan(color = 255, angle=main_angle, w=w, h=h, delta=30, dimen=1, radius=60)
+        fans['l'] = ct.get_camera_fan(color = 255, angle=main_angle-60, w=w, h=h, delta=90, dimen=1, radius=60)
+        fans['r'] = ct.get_camera_fan(color = 255, angle=main_angle+60, w=w, h=h, delta=90, dimen=1, radius=60)
         # fans['b'] = get_camera_fan(color = 255, angle=main_angle-180, w=w, h=h, delta=90, dimen=1, radius=60)
 
         
@@ -224,7 +224,7 @@ class Tracker():
         else:
             time.sleep(1)
             while 1:
-                img_r = take_screenshot(self.minimap_rect)
+                img_r = ct.take_screenshot(self.minimap_rect)
                 [x,y,max_corr] = self.get_coord_by_map2( map_bgra, img_r, scale=2.09)
                 x, y = int(x/2), int(y/2)
                 dr = np.linalg.norm([x1-x,y1-y])
@@ -333,8 +333,7 @@ class Tracker():
 
             
             dx,dy = ne[0] - cx, ne[1] - cy
-            angle = np.degrees(np.arctan2(dy, dx))
-            r = np.linalg.norm([dx,dy])
+            angle, r = ct.cart_to_polar([dx,dy])
             if r < 30:
                 # pyautogui.click()
                 self.cc.fighting()
@@ -346,7 +345,7 @@ class Tracker():
         tx, ty = pos
         i = 0
         while 1:
-            img_r = take_screenshot(self.minimap_rect)
+            img_r = ct.take_screenshot(self.minimap_rect)
 
             rect = [x-200,y-200,400,400]
             [x,y,max_corr] = self.get_coord_by_map2( map_bgra, img_r, scale=2.09, rect= rect)
@@ -545,7 +544,7 @@ class Tracker():
         wf = int(w * scale)
 
         cv.rectangle(map_b, max_loc, np.add(max_loc, [wf,hf]), 255, 5   )
-        show_img(map_b, 0.25)
+        ct.show_img(map_b, 0.25)
         
         return scale
 
@@ -563,7 +562,7 @@ class Tracker():
         log.info(way_points)
         log.info(start_point)
 
-        pyautogui.keyDown('w')
+
         current_point = start_point
         sorted_points = [start_point]
         while 1:
@@ -581,6 +580,16 @@ class Tracker():
         for i in range(1, len(sorted_points)):
             x0, y0 = sorted_points[i-1]
             x1, y1 = sorted_points[i]
+            if i == 1:
+                angle0, _ = ct.cart_to_polar([x1-x0,y1-y0])
+                print(f'路线刚开始，先转向至{angle0}')
+                pyautogui.press('w')
+                time.sleep(0.5)
+                self.turn_to(angle0)
+                pyautogui.press('w')
+                time.sleep(1)
+
+                pyautogui.keyDown('w')
             self.move_to([x0, y0], [x1, y1], map_bgra)
 
         pyautogui.keyUp('w')
@@ -626,7 +635,7 @@ def test_2(index):
     # show_img(b, 0.25)
     map_b = cv.threshold(b, 20, 150, cv.THRESH_BINARY)[1]
 
-    mini = take_fine_screenshot([77,88,127,127])
+    mini = ct.take_fine_screenshot([77,88,127,127])
     show_img(mini)
     mini = cv.cvtColor(mini, cv.COLOR_BGR2GRAY)
     mini_b = cv.threshold(mini, 20, 150, cv.THRESH_BINARY)[1]
@@ -653,7 +662,7 @@ def test_4():
 
 
 
-    img_r = take_fine_screenshot(tr.minimap_rect)
+    img_r = ct.take_fine_screenshot(tr.minimap_rect)
     [index, [x,y], [hw,hh] ,corr] = tr.find_map(img_r )
     map_r = tr.load_map(index, tr.map_prefix)
 
@@ -664,7 +673,7 @@ def test_4():
     print([hw,hh])
     cv.rectangle(map_r, [x,y], [x+1,y+1], [0,0,255],5 )
     cv.rectangle(map_r, [x-hw,y-hh], [x+hw,y+hh], [255,0,0],5 )
-    show_img(img_r)
+    ct.show_img(img_r)
     show_img(map_r,0.25)
 
 def test_5():
@@ -694,7 +703,7 @@ def test_6():
     sw()
     time.sleep(0.5)
 
-    img = take_fine_screenshot()
+    img = ct.take_fine_screenshot()
     # img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
     cv.imwrite( 'test.png', img)
 
@@ -707,7 +716,7 @@ def test_7():
     tr = Tracker()
 
     while not get_image_pos(f'{prefix}atlas_portal.jpg', 0.9):
-        image = take_fine_screenshot(tr.minimap_rect)
+        image = ct.take_fine_screenshot(tr.minimap_rect)
         kernel = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=np.uint8)
         image =  cv2.dilate(image, kernel, iterations=1)
         image_b = get_binary(image, 30)

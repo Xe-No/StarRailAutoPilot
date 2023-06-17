@@ -7,23 +7,109 @@ import numpy as np
 import win32gui, win32api, win32con
 import pyautogui
 
-def find_color_points(img, bgr_color, max_sq = 64):
-    mask = np.sum((img-bgr_color)**2,axis=-1)<= max_sq
-    mask = np.uint8(mask)*255
-    cv.imwrite('mask.png',mask)
-    retval, labels, stats, centroids = cv.connectedComponentsWithStats(mask, connectivity=8)
 
-    
-    # log.info(len(stats))
+def cart_to_polar(xy):
+    x,y = xy
+    angle = np.degrees(np.arctan2(y, x))
+    r = np.linalg.norm([x, y])
+    return angle, r
+
+def get_vec(pos1,pos2):
+    x1,y1 =pos1
+    x2,y2 =pos2
+    return  [x2-x1,y2-y1]
+
+def draw_lines(img, point_list, color=(0, 255, 0), thickness=2):
+    '''
+    在给定的图像上绘制多条线段。
+
+    Args:
+        img: 待绘制的原始图像，可以是 numpy.ndarray 类型。
+        point_list: 包含多个点坐标的列表，用来表示需要连接的线段的端点坐标。
+        color: 线段颜色，可以是元组类型，例如 (0, 255, 0) 表示绿色，默认为 (0, 255, 0)。
+        thickness: 线段宽度，用来控制线段的粗细程度，默认为 2。
+
+    Returns:
+        绘制完成后的图像。
+
+    Raises:
+        TypeError: 如果输入参数格式不正确，则会抛出类型错误异常。
+    '''
+    if not isinstance(img, np.ndarray):
+        raise TypeError('The input `img` parameter must be a numpy.ndarray type.')
+    # if not isinstance(color, tuple) or not all(isinstance(c, int) and 0 <= c <= 255 for c in color):
+    #     raise TypeError('The input `color` parameter must be a tuple of integers between 0 and 255.')
+    if not isinstance(thickness, int) or thickness < 1:
+        raise TypeError('The input `thickness` parameter must be a positive integer.')
+
+    for i in range(len(point_list)-1):
+        pt1 = point_list[i]
+        pt2 = point_list[i+1]
+        cv.line(img, pt1, pt2, color, thickness)
+
+    return img
+
+def get_sorted_waypoints(map_hsv, points):
+    hcolor = {}
+    hcolor['start'] = 180 / 2
+    hcolor['pioneer'] = 60 / 2
+    hcolor['hunt'] = 10 / 2
+    hcolor['garbage'] = 40 / 2
+
+    waypoints = []
+    for point in points:
+        waypoint = {}
+        waypoint['pos'] = point
+        h, s, v = map_hsv[point[1], point[0]]
+        waypoint['s'] = s
+        waypoint['type'] = [k for k, val in hcolor.items() if val == h][0]
+        waypoints.append(waypoint)
+
+    waypoints = sorted(waypoints, key=lambda x: x['s'])
+    si, sp = [[i, waypoint] for i, waypoint in enumerate(waypoints) if waypoint['type'] == 'start'][0]
+    sorted_waypoints = [sp]
+    sp['index'] = 0
+    waypoints.pop(si)
+    cp = sp
+    count = 1
+    while 1:
+
+        if len(waypoints) == 0:
+            break
+        # 根据s，找s==最大值的列表
+        max_s = max(waypoints, key=lambda x: x['s'])['s']
+        print(max_s)
+        max_list = [[i, waypoint] for i, waypoint in enumerate(waypoints) if waypoint['s'] == max_s]
+
+        print(max_list)
+        # 找到最近的点并排序
+        ci, cp = min(max_list, key=lambda x: np.linalg.norm(get_vec(x[1]['pos'], cp['pos'])))
+        # 最大值列表必然位于前面
+        # ci = [ i for i, p in enumerate(max_list) if p['pos'] == cp['pos']][0]
+        cp['index'] = count
+        waypoints.pop(ci)
+        sorted_waypoints.append(cp)
+        count += 1
+    return sorted_waypoints
+
+def find_cluster_points(mask):
+    retval, labels, stats, centroids = cv.connectedComponentsWithStats(mask, connectivity=8)
     # 输出每个聚类的中心坐标
     result = []
     for i in range(1, len(stats)):
-
         x = int(stats[i][0] + stats[i][2] / 2)
         y = int(stats[i][1] + stats[i][3] / 2)
-        result.append((x, y))
-    
+        result.append([x, y])
     return result
+def find_color_points(img, bgr_color, max_sq = 64):
+    mask = np.sum((img-bgr_color)**2,axis=-1)<= max_sq
+    mask = np.uint8(mask)*255
+    cv.imwrite('debug/mask.png', mask)
+    return find_cluster_points(mask)
+
+def find_color_points_inrange(img, lowerb, upperb):
+    mask = cv.inRange(img, lowerb, upperb)
+    return find_cluster_points(mask)
 
 def find_nearest_point(points, target):
     """

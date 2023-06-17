@@ -45,7 +45,7 @@ class calculated:
         self.scaling = self.config_obj.get("scaling", 1)
         self.mouse = MouseController()
         self.keyboard = KeyboardController()
-        self.ocr = CnOcr(det_model_name=det_model_name, rec_model_name=rec_model_name,det_root="./model/cnocr", rec_root="./model/cnstd") if not number else CnOcr(det_model_name=det_model_name, rec_model_name=rec_model_name,det_root="./model/cnocr", rec_root="./model/cnstd", cand_alphabet='0123456789')
+        # self.ocr = CnOcr(det_model_name=det_model_name, rec_model_name=rec_model_name,det_root="./model/cnocr", rec_root="./model/cnstd") if not number else CnOcr(det_model_name=det_model_name, rec_model_name=rec_model_name,det_root="./model/cnocr", rec_root="./model/cnstd", cand_alphabet='0123456789')
         #self.ocr = CnOcr(det_model_name='db_resnet34', rec_model_name='densenet_lite_114-fc')
         self.check_list = lambda x,y: re.match(x, str(y)) != None
         self.compare_lists = lambda a, b: all(x <= y for x, y in zip(a, b))
