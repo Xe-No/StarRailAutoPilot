@@ -550,8 +550,8 @@ class Tracker():
 
     def run_route(self, map_index, path= 'maps/'):
         img_r = ct.take_screenshot(self.minimap_rect)
-        map_bgra = cv.imread(f'{path}{map_index}.png', cv.IMREAD_UNCHANGED)
-        map_bgr = cv.imread(f'{path}{map_index}.png')
+        map_bgra = cv.imread(f'{path}{map_index}', cv.IMREAD_UNCHANGED)
+        map_bgr = cv.imread(f'{path}{map_index}')
         # self.load_all_masked_maps()
 
         r = np.sum((map_bgr-self.bgr_map_way)**2,axis=-1)<= 64
