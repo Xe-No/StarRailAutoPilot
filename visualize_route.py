@@ -1,10 +1,11 @@
 import os
 import re
-
+import json
 import cv2 as cv
 import numpy as np
 
 import utils.cv_tools as ct
+import utils.io_route as ior
 
 '''
 
@@ -31,33 +32,38 @@ H!=0,S>10,V==100
 '''
 
 
-def visualize_route(route_file, path):
-    map_bgr = cv.imread(f'{path}{route_file}')
-    map_hsv = cv.cvtColor(map_bgr, cv.COLOR_BGR2HSV)
-    imh, ims, imv = cv.split(map_hsv)
 
-    mask = np.uint8(ims > 25) * 255
-    points = ct.find_cluster_points(mask)
-    sorted_waypoints = ct.get_sorted_waypoints(map_hsv, points)
+
+
+def visualize_route(route_file):
+    print(route_file)
+    map_bgr = cv.imread(f'maps/{route_file}')
+    sorted_waypoints = ior.import_route(f'maps/{route_file}')
+    # return 
+    ior.save_route(f'debug/{route_file}.json', sorted_waypoints)
+
+
+    
     sorted_positions = [p.get('pos', None) for p in sorted_waypoints]
 
-    print(sorted_waypoints)
-    print(sorted_positions)
+    # print(sorted_waypoints)
+    # print(sorted_positions)
 
     line_img = np.zeros_like(map_bgr)
     ct.draw_lines(line_img, sorted_positions, color=[255, 255, 255], thickness=2)
     output = cv.addWeighted(map_bgr, 1, line_img, 0.1, 0)
 
-    cv.imwrite(f'debug/v-{route_file}.png', output)
+    cv.imwrite(f'debug/v-{route_file}', output)
 
 
-path = 'maps/'
+folder = 'maps/'
 
-files = os.listdir(path)
+files = os.listdir(folder)
 
 # 使用正则表达式筛选出符合条件的文件名
 pattern = r'\w+-\w+\.png'
 matched_files = [f for f in files if re.match(pattern, f)]
 print(matched_files)
-for f in matched_files:
-    visualize_route(f, path)
+for file in matched_files:
+    visualize_route(file)
+    break
